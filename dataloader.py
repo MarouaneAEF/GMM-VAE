@@ -1,11 +1,8 @@
 import torch
 import torch.utils.data
-from torch.nn import functional as F
 from torchvision import datasets, transforms
-from torch.utils.data.dataset import Dataset
-from scipy.io import loadmat
-import numpy as np
-import pickle
+
+
 
 
 def mnistloader(batchSize):
