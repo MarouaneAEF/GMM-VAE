@@ -4,14 +4,14 @@ from torch.nn import functional as F
 
 class GMVAE(nn.Module):
 
-	def __init__(self, K=10, x_size=200, hidden_size=500, w_size=150, img_size=28, input_channel=1):
+	def __init__(self, K=10, x_size=200, hidden_size=500, w_size=150, img_size=32, input_channel=3):
 		super(GMVAE, self).__init__()
 		self.K = K
 		self.x_size = x_size
 		self.hiddend_size = hidden_size
 		self.w_size = w_size
 		# image size img_size * img_size
-		self.img_size = 32 
+		self.img_size = img_size 
 		# input_channel 
 		self.input_channel = input_channel
 		# cuda
