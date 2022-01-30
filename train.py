@@ -10,8 +10,7 @@ trainer = Trainer(model=GMVAE(),
                 dataloader=dl.cifar10loader(batch_size=64),#dl.mnistloader(batchSize=64), 
                 optim=optim.Adam,
                 n_epoches=2,
-				img_size=32, 
-				input_channel=3
+				
                 )
 
 

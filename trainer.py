@@ -21,6 +21,7 @@ class Trainer:
         # 1. Reconstruction Cost = -E[log(P(y|x))]
         # for dataset like MNIST the recon_loss is binary cross entrpy 
         # recon_loss should be reconsidred depending on the nature of the dataset 
+    
         recon_loss = F.binary_cross_entropy(recon_X, X,size_average=False)
         
         # recon_loss for normally distributed data, we can consider the negative log likelihood as a loss 

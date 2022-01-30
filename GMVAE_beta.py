@@ -34,7 +34,7 @@ class GMVAE(nn.Module):
 		)
 		
 		# --- output of bottlneck -----
-		x = torch.rand(1,self.img_size,self.img_size).view(-1,1,self.img_size,self.img_size)
+		x = torch.rand(self.input_channel,self.img_size,self.img_size).view(-1,self.input_channel,self.img_size,self.img_size)
 		self._after_bottlneck = None
 		self._before_bottlneck = None
 		self.before_bottlneck(x)
@@ -89,7 +89,7 @@ class GMVAE(nn.Module):
 			nn.BatchNorm2d(16),
 			nn.ReLU(),
 
-			nn.ConvTranspose2d(16, 1, 6, 1, 0)
+			nn.ConvTranspose2d(16, self.input_channel, 6, 1, 0)
 		)
 		
 	
