@@ -4,19 +4,23 @@ from torch.nn import functional as F
 
 class GMVAE(nn.Module):
 
-	def __init__(self, K=10, x_size=200, hidden_size=500, w_size=150):
+	def __init__(self, K=10, x_size=200, hidden_size=500, w_size=150, img_size=28, input_channel=1):
 		super(GMVAE, self).__init__()
 		self.K = K
 		self.x_size = x_size
 		self.hiddend_size = hidden_size
 		self.w_size = w_size
+		# image size img_size * img_size
+		self.img_size = 32 
+		# input_channel 
+		self.input_channel = input_channel
 		# cuda
 		self.device = torch.device("cuda")
 		# Recognition model:
         # input stack :
 		# ----------encConvStack----------
 		self.encConvStack = nn.Sequential(
-			nn.Conv2d(1, 16, 6, 1, 0, bias=False),
+			nn.Conv2d(self.input_channel, 16, 6, 1, 0, bias=False),
 			nn.BatchNorm2d(16),
 			nn.ReLU(),
 
@@ -30,7 +34,7 @@ class GMVAE(nn.Module):
 		)
 		
 		# --- output of bottlneck -----
-		x = torch.rand(1,28,28).view(-1,1,28,28)
+		x = torch.rand(1,self.img_size,self.img_size).view(-1,1,self.img_size,self.img_size)
 		self._after_bottlneck = None
 		self._before_bottlneck = None
 		self.before_bottlneck(x)
