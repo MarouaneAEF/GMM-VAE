@@ -15,8 +15,6 @@ By : Nat Dilokthanakul and Pedro A. M. Mediano and Marta Garnelo and Matthew C. 
 
 (https://arxiv.org/abs/1611.02648)
 
-My acknowledgements go especially to bhavikngala for his inspiration Link: https://github.com/bhavikngala/gaussian_mixture_vae
-
 
 
 
