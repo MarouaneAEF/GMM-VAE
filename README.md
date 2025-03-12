@@ -19,9 +19,13 @@ Contrary to classical VAE models, this model assumes that observed data (inputs)
 
 ## Training Progress
 
-![Training Progress](animations/cifar10_K10_large_comparisons.gif)
+### CIFAR-10 Dataset (K=10)
+![CIFAR-10 Training Progress](animations/cifar10_K10_large_comparisons.gif)
 
-*Reconstruction quality improves throughout training epochs*
+### Custom Image Dataset (K=10)
+![Custom Dataset Training Progress](animations/custom_K10_large_comparisons.gif)
+
+*Reconstruction quality improves throughout training epochs as the model learns to capture patterns*
 
 ## Applications
 
