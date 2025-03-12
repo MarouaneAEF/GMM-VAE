@@ -19,12 +19,7 @@ Contrary to classical VAE models, this model assumes that observed data (inputs)
 
 ## Training Progress
 
-<div style="display: flex; flex-direction: row; justify-content: space-between;">
-  <div style="width: 100%; text-align: center;">
-    <h3>CIFAR-10 Dataset (K=10) - Horizontal Progress</h3>
-    <img src="animations/horizontal/cifar10_K10_horizontal.gif" alt="CIFAR-10 Training Progress (Horizontal)" width="100%">
-  </div>
-</div>
+![Training Progress Bar](animations/progress/horizontal_bar.gif)
 
 *Reconstruction quality improves throughout training epochs as the model learns to capture patterns*
 
