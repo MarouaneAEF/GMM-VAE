@@ -19,7 +19,7 @@ Contrary to classical VAE models, this model assumes that observed data (inputs)
 
 ## Training Progress
 
-![Training Progress Bar](animations/progress/horizontal_bar.gif)
+![CIFAR-10 Training Progress](animations/compact/cifar10_horizontal.gif)
 
 *Reconstruction quality improves throughout training epochs as the model learns to capture patterns*
 
