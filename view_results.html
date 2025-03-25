@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VAE Results Viewer</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 20px; background: #f5f5f7; }
+        h1, h2 { color: #1d1d1f; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .model { margin-bottom: 30px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .tabs { display: flex; margin-bottom: 15px; border-bottom: 1px solid #ddd; }
+        .tab { padding: 8px 16px; cursor: pointer; margin-right: 5px; border-radius: 4px 4px 0 0; }
+        .tab.active { background: #0071e3; color: white; }
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 15px; }
+        .image-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .image-card img { width: 100%; height: auto; display: block; }
+        .image-caption { padding: 10px; text-align: center; font-size: 14px; color: #555; }
+        .help { margin-top: 30px; padding: 15px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0071e3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GM-VAE Results Viewer</h1>
+        
+        <div class="model">
+            <h2>MPS-Optimized Model (K=12)</h2>
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('mps-standard')">Standard</div>
+                <div class="tab" onclick="showTab('mps-large')">Large Comparisons</div>
+                <div class="tab" onclick="showTab('mps-clusters')">Clusters</div>
+            </div>
+            
+            <div id="mps-standard" class="gallery">
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K12/reconstructions/standard/reconstruction_epoch_5.png" alt="Epoch 5">
+                    <div class="image-caption">Epoch 5</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K12/reconstructions/standard/reconstruction_epoch_10.png" alt="Epoch 10">
+                    <div class="image-caption">Epoch 10</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K12/reconstructions/standard/reconstruction_epoch_15.png" alt="Epoch 15">
+                    <div class="image-caption">Epoch 15</div>
+                </div>
+            </div>
+            
+            <div id="mps-large" class="gallery" style="display: none;">
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K12/reconstructions/large_comparisons/large_comparison_epoch_5.png" alt="Large Comparison Epoch 5">
+                    <div class="image-caption">Large Comparison - Epoch 5</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K12/reconstructions/large_comparisons/large_comparison_epoch_10.png" alt="Large Comparison Epoch 10">
+                    <div class="image-caption">Large Comparison - Epoch 10</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K12/reconstructions/large_comparisons/large_comparison_epoch_15.png" alt="Large Comparison Epoch 15">
+                    <div class="image-caption">Large Comparison - Epoch 15</div>
+                </div>
+            </div>
+            
+            <div id="mps-clusters" class="gallery" style="display: none;">
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K12/reconstructions/clusters/clusters_epoch_5.png" alt="Clusters Epoch 5">
+                    <div class="image-caption">Clusters - Epoch 5</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K12/reconstructions/clusters/clusters_epoch_10.png" alt="Clusters Epoch 10">
+                    <div class="image-caption">Clusters - Epoch 10</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K12/reconstructions/clusters/clusters_epoch_15.png" alt="Clusters Epoch 15">
+                    <div class="image-caption">Clusters - Epoch 15</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="model">
+            <h2>Stylized Model (K=15)</h2>
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('stylized-standard')">Standard</div>
+                <div class="tab" onclick="showTab('stylized-large')">Large Comparisons</div>
+                <div class="tab" onclick="showTab('stylized-clusters')">Clusters</div>
+            </div>
+            
+            <div id="stylized-standard" class="gallery">
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/standard/reconstruction_epoch_5.png" alt="Epoch 5">
+                    <div class="image-caption">Epoch 5</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/standard/reconstruction_epoch_15.png" alt="Epoch 15">
+                    <div class="image-caption">Epoch 15</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/standard/reconstruction_epoch_30.png" alt="Epoch 30">
+                    <div class="image-caption">Epoch 30</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/standard/reconstruction_epoch_45.png" alt="Epoch 45">
+                    <div class="image-caption">Epoch 45</div>
+                </div>
+            </div>
+            
+            <div id="stylized-large" class="gallery" style="display: none;">
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/large_comparisons/large_comparison_epoch_5.png" alt="Large Comparison Epoch 5">
+                    <div class="image-caption">Large Comparison - Epoch 5</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/large_comparisons/large_comparison_epoch_15.png" alt="Large Comparison Epoch 15">
+                    <div class="image-caption">Large Comparison - Epoch 15</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/large_comparisons/large_comparison_epoch_30.png" alt="Large Comparison Epoch 30">
+                    <div class="image-caption">Large Comparison - Epoch 30</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/large_comparisons/large_comparison_epoch_45.png" alt="Large Comparison Epoch 45">
+                    <div class="image-caption">Large Comparison - Epoch 45</div>
+                </div>
+            </div>
+            
+            <div id="stylized-clusters" class="gallery" style="display: none;">
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/clusters/clusters_epoch_5.png" alt="Clusters Epoch 5">
+                    <div class="image-caption">Clusters - Epoch 5</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/clusters/clusters_epoch_15.png" alt="Clusters Epoch 15">
+                    <div class="image-caption">Clusters - Epoch 15</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/clusters/clusters_epoch_30.png" alt="Clusters Epoch 30">
+                    <div class="image-caption">Clusters - Epoch 30</div>
+                </div>
+                <div class="image-card">
+                    <img src="results/gmvae_custom_K15/reconstructions/clusters/clusters_epoch_45.png" alt="Clusters Epoch 45">
+                    <div class="image-caption">Clusters - Epoch 45</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="help">
+            <h3>How to use this viewer:</h3>
+            <p>1. Open this HTML file in your web browser by double-clicking it or using the command:<br>
+            <code>open view_results.html</code></p>
+            <p>2. Click on the tabs to switch between different visualization types</p>
+            <p>3. If images are not loading, check the paths match your directory structure</p>
+        </div>
+    </div>
+
+    <script>
+    function showTab(tabId) {
+        // Get parent model
+        const parentModel = document.getElementById(tabId).parentElement;
+        
+        // Hide all galleries in this model
+        const galleries = parentModel.querySelectorAll('.gallery');
+        galleries.forEach(gallery => {
+            gallery.style.display = 'none';
+        });
+        
+        // Show selected gallery
+        document.getElementById(tabId).style.display = 'grid';
+        
+        // Update active tab
+        const tabs = parentModel.querySelectorAll('.tab');
+        tabs.forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        parentModel.querySelector(`.tab[onclick*="${tabId}"]`).classList.add('active');
+    }
+    </script>
+</body>
+</html> 
