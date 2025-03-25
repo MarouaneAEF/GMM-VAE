@@ -6,7 +6,7 @@ mkdir -p models
 
 # Set the correct path to the user's high-resolution photos
 CURRENT_DIR=$(pwd)
-ABSOLUTE_DATA_DIR="$CURRENT_DIR/../vae-cursor/augmented_images"
+ABSOLUTE_DATA_DIR="$CURRENT_DIR/../vae/augmented_images"
 
 echo "Using data directory: $ABSOLUTE_DATA_DIR"
 

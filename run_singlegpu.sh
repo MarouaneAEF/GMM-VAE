@@ -6,7 +6,7 @@ mkdir -p models
 
 # Get the absolute path to the data directory (parent directory of this script)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ABSOLUTE_DATA_DIR="../vae-cursor/augmented_images"
+ABSOLUTE_DATA_DIR="../vae/augmented_images" 
 
 echo "Data directory: $ABSOLUTE_DATA_DIR"
 

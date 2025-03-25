@@ -5,7 +5,7 @@ mkdir -p results
 mkdir -p models
 
 # Get the absolute path to the data directory
-ABSOLUTE_DATA_DIR="../vae-cursor/augmented_images"
+ABSOLUTE_DATA_DIR="../vae/augmented_images"
 
 echo "Data directory: $ABSOLUTE_DATA_DIR"
 
