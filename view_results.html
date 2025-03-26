@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>VAE Results Viewer</title>
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 20px; background: #f5f5f7; }
@@ -23,13 +24,13 @@
         <h1>GM-VAE Results Viewer</h1>
         
         <div class="warning">
-            <h3>⚠️ Important: Images générées localement</h3>
-            <p>Cette visionneuse affiche les images <strong>générées localement</strong> pendant l'entraînement de vos modèles. Les images ne sont pas incluses dans le dépôt GitHub et doivent être générées avec la commande <code>./run_*.sh</code>.</p>
-            <p>Si vous ne voyez pas d'images, c'est normal - vous devez d'abord entraîner un modèle qui générera des reconstructions dans le dossier <code>results/</code>.</p>
+            <h3>⚠️ Important: Images generees localement</h3>
+            <p>Cette visionneuse affiche les images <strong>generees localement</strong> pendant l'entrainement de vos modeles. Les images ne sont pas incluses dans le depot GitHub et doivent etre generees avec la commande <code>./run_*.sh</code>.</p>
+            <p>Si vous ne voyez pas d'images, c'est normal - vous devez d'abord entrainer un modele qui generera des reconstructions dans le dossier <code>results/</code>.</p>
             <p>Pour utiliser cette visionneuse:</p>
             <ol>
-                <li>Entraînez un modèle avec l'un des scripts (ex: <code>./run_singlegpu.sh</code>)</li>
-                <li>Exécutez <code>./view_results.sh</code> pour ouvrir cette page dans votre navigateur</li>
+                <li>Entrainez un modele avec l'un des scripts (ex: <code>./run_singlegpu.sh</code>)</li>
+                <li>Executez <code>./view_results.sh</code> pour ouvrir cette page dans votre navigateur</li>
             </ol>
         </div>
         
@@ -154,11 +155,11 @@
         </div>
         
         <div class="help">
-            <h3>How to use this viewer:</h3>
-            <p>1. Open this HTML file in your web browser by double-clicking it or using the command:<br>
-            <code>open view_results.html</code></p>
-            <p>2. Click on the tabs to switch between different visualization types</p>
-            <p>3. If images are not loading, check the paths match your directory structure</p>
+            <h3>Comment utiliser cette visionneuse:</h3>
+            <p>1. Ouvrez ce fichier HTML dans votre navigateur en double-cliquant dessus ou en utilisant la commande:<br>
+            <code>./view_results.sh</code></p>
+            <p>2. Cliquez sur les onglets pour basculer entre les differents types de visualisation</p>
+            <p>3. Si les images ne se chargent pas, verifiez que les chemins correspondent a votre structure de dossiers</p>
         </div>
     </div>
 
