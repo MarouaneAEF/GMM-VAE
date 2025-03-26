@@ -35,7 +35,7 @@ This GMM-VAE model is ideal for:
 
 ## Quick Start
 
-The project now includes several convenient scripts for different training scenarios:
+The project includes several convenient scripts for different training scenarios:
 
 ```bash
 # Clean previous results and train with MPS optimization
@@ -44,8 +44,20 @@ The project now includes several convenient scripts for different training scena
 # Train on CIFAR-10 dataset
 ./run_cifar10.sh
 
-# Train on custom images with MPS optimization
+# Train on custom images with MPS optimization for Apple Silicon
 ./run_mps_optimized.sh
+
+# Train on GPU with CUDA acceleration
+./run_gpu_training.sh
+
+# Train with lower resolution for memory-constrained environments
+./run_lowres_training.sh
+
+# Train with medium quality settings (balanced speed/quality)
+./run_medium_quality.sh
+
+# Advanced training with custom parameters
+./run_advanced_training.sh
 ```
 
 ## Using with Custom Images
@@ -58,7 +70,7 @@ The model is specifically enhanced to work with your own high-resolution photos:
    ./run_training.sh     # For standard training with larger batch size
    ```
 
-2. **Reconstruction Visualization**: During training, the model automatically saves reconstructed images in organized folders:
+2. **Reconstruction Visualization**: During training, the model automatically saves reconstructed images in organized folders that you can view directly in your file browser:
    ```
    results/gmvae_custom_K10/reconstructions/
    ├── standard/             # Traditional reconstruction grids
@@ -104,6 +116,14 @@ If you use this code in your research, please cite:
   year={2016}
 }
 ```
+
+## Latest Updates
+
+- Streamlined repository structure
+- Optimized codebase for better performance
+- Added support for various training configurations
+- Enhanced documentation and usage examples
+- Fixed encoding issues and improved user experience
 
 
 

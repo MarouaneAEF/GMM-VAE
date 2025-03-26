@@ -66,4 +66,4 @@ chmod +x run_mps_optimized.sh
 ./run_mps_optimized.sh
 
 echo -e "${GREEN}Training complete!${NC}"
-echo -e "You can view the results using: ${YELLOW}open view_results.html${NC}" 
+echo -e "You can view the results by examining the generated images in the ${YELLOW}results/${NC} directory." 
