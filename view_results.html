@@ -15,11 +15,23 @@
         .image-card img { width: 100%; height: auto; display: block; }
         .image-caption { padding: 10px; text-align: center; font-size: 14px; color: #555; }
         .help { margin-top: 30px; padding: 15px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0071e3; }
+        .warning { padding: 15px; background: #fff7f0; border-radius: 8px; border-left: 4px solid #ff6900; margin-bottom: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>GM-VAE Results Viewer</h1>
+        
+        <div class="warning">
+            <h3>⚠️ Important: Images générées localement</h3>
+            <p>Cette visionneuse affiche les images <strong>générées localement</strong> pendant l'entraînement de vos modèles. Les images ne sont pas incluses dans le dépôt GitHub et doivent être générées avec la commande <code>./run_*.sh</code>.</p>
+            <p>Si vous ne voyez pas d'images, c'est normal - vous devez d'abord entraîner un modèle qui générera des reconstructions dans le dossier <code>results/</code>.</p>
+            <p>Pour utiliser cette visionneuse:</p>
+            <ol>
+                <li>Entraînez un modèle avec l'un des scripts (ex: <code>./run_singlegpu.sh</code>)</li>
+                <li>Exécutez <code>./view_results.sh</code> pour ouvrir cette page dans votre navigateur</li>
+            </ol>
+        </div>
         
         <div class="model">
             <h2>MPS-Optimized Model (K=12)</h2>

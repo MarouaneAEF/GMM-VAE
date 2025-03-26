@@ -1,3 +1,26 @@
 __pycache__/
 data/
 
+# Modèles entraînés (fichiers volumineux)
+models/*.pt
+
+# Résultats (images générées)
+results/
+
+# Logs de TensorBoard
+runs/
+
+# Fichiers temporaires
+*.tmp
+*.log
+
+# Environnement virtuel
+venv/
+.env/
+
+# Fichiers macOS
+.DS_Store
+
+# Fichiers PDF
+*.pdf
+
