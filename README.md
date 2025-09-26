@@ -127,6 +127,17 @@ If you use this code in your research, please cite:
 }
 ```
 
+## Time Series Forecasting Extension
+
+The project now includes a specialized module for time series forecasting that combines GM-VAE with LSTM networks:
+
+- **Location**: `timeseries_forecasting/` directory
+- **Features**: Temporal pattern learning, clustering, and probabilistic forecasting
+- **Use Cases**: Financial forecasting, demand prediction, sensor data analysis
+- **Quick Start**: `cd timeseries_forecasting && ./run_timeseries_training.sh`
+
+See `timeseries_forecasting/README.md` for detailed documentation.
+
 ## Latest Updates
 
 - Streamlined repository structure
@@ -134,6 +145,7 @@ If you use this code in your research, please cite:
 - Added support for various training configurations
 - Enhanced documentation and usage examples
 - Fixed encoding issues and improved user experience
+- **NEW**: Added time series forecasting module with GM-VAE LSTM architecture
 
 
 
