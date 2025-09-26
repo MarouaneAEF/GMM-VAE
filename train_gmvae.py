@@ -36,8 +36,8 @@ def parse_args():
     parser.add_argument('--dataset', type=str, default='custom', 
                         choices=['mnist', 'cifar10', 'custom'],
                         help='dataset to use (default: custom)')
-    parser.add_argument('--data-dir', type=str, default='../vae-cursor/augmented_images',
-                        help='directory containing the custom images (default: ../vae-cursor/augmented_images)')
+    parser.add_argument('--data-dir', type=str, default='../vae/augmented_images',
+                        help='directory containing the custom images (default: ../vae/augmented_images)')
     parser.add_argument('--batch-size', type=int, default=32,
                         help='input batch size for training (default: 32)')
     parser.add_argument('--max-images', type=int, default=None,

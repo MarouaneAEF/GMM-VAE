@@ -45,6 +45,9 @@ python test_timeseries_model.py \
     --hidden-dim 64 \
     --latent-dim 16 \
     --num-clusters 4
+
+# Run interactive demo
+python demo_timeseries.py
 ```
 
 ## Parameters
@@ -66,6 +69,20 @@ python test_timeseries_model.py \
 ### Loss Weights
 - `--kl-weight`: KL divergence weight (default: 0.1)
 - `--recon-weight`: Reconstruction loss weight (default: 1.0)
+
+## Quick Demo
+
+To see the model in action without training, run the interactive demo:
+
+```bash
+python demo_timeseries.py
+```
+
+This will:
+- Generate forecasts for different time series patterns
+- Show clustering capabilities
+- Create visualization plots
+- Demonstrate the model's probabilistic nature
 
 ## Usage Examples
 

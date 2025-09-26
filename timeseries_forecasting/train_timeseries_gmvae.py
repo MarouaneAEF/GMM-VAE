@@ -55,10 +55,10 @@ def prepare_sequences(data, sequence_length, forecast_horizon):
     X, y = [], []
     
     for i in range(len(data) - sequence_length - forecast_horizon + 1):
-        # Input sequence
-        x_seq = data[i:i+sequence_length]
-        # Target sequence (for reconstruction)
-        y_seq = data[i+sequence_length:i+sequence_length+forecast_horizon]
+        # Input sequence - take the first sequence_length points
+        x_seq = data[i, :sequence_length]
+        # Target sequence - take the next forecast_horizon points
+        y_seq = data[i, sequence_length:sequence_length+forecast_horizon]
         
         X.append(x_seq)
         y.append(y_seq)
@@ -244,6 +244,11 @@ def main():
     y_val = torch.FloatTensor(y_val).unsqueeze(-1)
     X_test = torch.FloatTensor(X_test).unsqueeze(-1)
     y_test = torch.FloatTensor(y_test).unsqueeze(-1)
+    
+    # Debug: Print shapes
+    print(f"X_train shape: {X_train.shape}")
+    print(f"y_train shape: {y_train.shape}")
+    print(f"Expected input shape: (batch_size, {args.sequence_length}, 1)")
     
     # Create data loaders
     train_dataset = TensorDataset(X_train, y_train)

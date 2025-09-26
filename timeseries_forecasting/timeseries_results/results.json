@@ -1,0 +1,28 @@
+{
+  "args": {
+    "data_dir": "./timeseries_data",
+    "batch_size": 32,
+    "epochs": 1,
+    "lr": 0.001,
+    "hidden_dim": 64,
+    "latent_dim": 16,
+    "num_clusters": 4,
+    "sequence_length": 20,
+    "forecast_horizon": 5,
+    "lstm_layers": 2,
+    "dropout": 0.1,
+    "kl_weight": 0.1,
+    "recon_weight": 1.0,
+    "device": "auto",
+    "save_dir": "./timeseries_results",
+    "save_interval": 10
+  },
+  "final_test_loss": 32.80654198782785,
+  "best_val_loss": 31.038531167166575,
+  "train_losses": [
+    23.365447368621826
+  ],
+  "val_losses": [
+    31.038531167166575
+  ]
+}
