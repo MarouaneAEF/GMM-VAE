@@ -1,164 +1,162 @@
-## GM‑VAE – Détection d’anomalies pour l’industrie & maintenance prédictive
+## GM‑VAE – Industrial anomaly detection & predictive maintenance
 
-**GM‑VAE** est un moteur d’IA conçu pour l’**industrie** : il apprend automatiquement les **modes de fonctionnement normaux** de vos machines, lignes de production ou procédés, puis détecte les **comportements anormaux** avant qu’ils ne se transforment en pannes, dérives qualité ou arrêts imprévus.
+**GM‑VAE** is an AI engine designed for **industrial environments**: it learns the **normal operating modes** of your machines, production lines, or processes, then detects **abnormal behaviors** before they turn into breakdowns, quality drifts, or unplanned shutdowns.
 
-L’objectif : **réduire les arrêts non planifiés**, **diminuer la casse & les rebuts**, et **augmenter la disponibilité des équipements** sans dépendre de gros volumes de données labellisées.
-
----
-
-## Problème industriel adressé
-
-Dans les usines, ateliers et infrastructures :
-
-- Les équipements génèrent **des milliers de signaux** (température, vibration, pression, courant, débits, vitesses…).
-- Les **pannes critiques** et les **dérives de process** sont rares mais **extrêmement coûteuses** :
-  - arrêts de ligne,
-  - pénalités de retard,
-  - rebuts et retours clients,
-  - risques sécurité.
-- Les approches classiques reposent sur :
-  - des **règles fixes** (seuils sur capteurs, règles métier codées à la main) → beaucoup de fausses alertes, peu de robustesse,
-  - des **modèles supervisés** qui exigent un historique riche d’incidents bien labellisés → rarement disponible.
-
-Résultat :  
-Les équipes maintenance & process passent trop de temps à **éteindre des incendies**, et pas assez à **prévenir les incidents**.
+The goal: **reduce unplanned downtime**, **cut scrap & rework**, and **increase equipment availability** without relying on large volumes of labeled failure data.
 
 ---
 
-## Solution : apprendre automatiquement les régimes de fonctionnement “sains”
+## Industrial problem addressed
 
-**GM‑VAE** apprend à partir des **données historiques de fonctionnement normal** de vos équipements (ou majoritairement normales), sans labels d’anomalies, pour :
+In plants, workshops, and critical infrastructures:
 
-- **Modéliser les différents régimes de fonctionnement** (vitesse lente/rapide, charge partielle/pleine charge, modes jour/nuit, configuration produit, etc.).
-- **Attribuer un score d’anomalie** à chaque nouvelle observation ou fenêtre temporelle :
-  - si le comportement ressemble à un régime connu → normal,
-  - s’il s’en écarte fortement → suspicion d’anomalie.
-- **Fournir un signal unifié** (“santé” de la machine / du process) que l’on peut surveiller en continu et connecter à l’alerting existant.
+- Equipment generates **thousands of signals** (temperature, vibration, pressure, current, flow, speed, etc.).
+- **Critical failures** and **process drifts** are rare but **extremely costly**:
+  - line stops,
+  - delay penalties,
+  - scrap and customer returns,
+  - safety risks.
+- Traditional approaches rely on:
+  - **static rules** (thresholds on sensors, hand‑crafted business rules) → many false alarms, brittle behavior,
+  - **supervised models** that require rich, well‑labeled incident histories → rarely available in practice.
 
-Techniquement, GM‑VAE combine :
-
-- un **Variational Autoencoder (VAE)** qui apprend une représentation compacte des signaux,
-- un **Gaussian Mixture Model (GMM)** qui segmente automatiquement ces représentations en **régimes de fonctionnement typiques**.
+As a result, maintenance and process teams spend too much time **reacting to issues** instead of **preventing them**.
 
 ---
 
-## KPI & impact industriel
+## Solution: automatically learn “healthy” operating regimes
 
-GM‑VAE vise à améliorer des indicateurs industriels clés :
+**GM‑VAE** learns from **historical normal (or mostly normal) operating data** of your equipment, without anomaly labels, in order to:
 
-- **Disponibilité & OEE (Overall Equipment Effectiveness)**
-  - **KPI** : réduction des arrêts non planifiés (%), augmentation de l’OEE global.
+- **Model different operating regimes** (slow/fast speed, partial/full load, day/night, product configurations, etc.).
+- **Assign an anomaly score** to each new observation or time window:
+  - if the behavior is close to a known regime → normal,
+  - if it deviates strongly → anomalous or suspicious.
+- **Provide a unified health signal** for each asset or process, which can be monitored continuously and plugged into existing alerting systems.
+
+Technically, GM‑VAE combines:
+
+- a **Variational Autoencoder (VAE)** that learns compact representations of multivariate signals,
+- a **Gaussian Mixture Model (GMM)** that segments these representations into **typical operating regimes**.
+
+---
+
+## KPIs & industrial impact
+
+GM‑VAE targets improvements on key industrial performance indicators:
+
+- **Availability & OEE (Overall Equipment Effectiveness)**
+  - **KPI**: reduced unplanned downtime (%), increased overall OEE.
 - **MTBF / MTTR**
-  - **KPI** : augmentation du **Mean Time Between Failures** (MTBF), réduction du **Mean Time To Repair** (MTTR) grâce à une détection plus précoce.
-- **Taux de rebuts & retours**
-  - **KPI** : diminution du taux de produits non conformes, réduction des coûts de non‑qualité.
-- **Coûts de maintenance**
-  - **KPI** : part de la maintenance passant du correctif au préventif/prédictif, baisse du coût global de maintenance par équipement.
-- **Charge des équipes**
-  - **KPI** : réduction du nombre de fausses alertes, temps économisé sur l’analyse manuelle de données ou de logs.
+  - **KPI**: higher **Mean Time Between Failures** (MTBF), lower **Mean Time To Repair** (MTTR) thanks to earlier detection.
+- **Scrap rate & customer returns**
+  - **KPI**: lower scrap / rework rate, reduced cost of poor quality.
+- **Maintenance costs**
+  - **KPI**: shift from corrective to preventive/predictive maintenance, reduction of maintenance cost per asset.
+- **Team workload**
+  - **KPI**: fewer false alerts, less time spent on manual data/log analysis.
 
-Ces KPI peuvent être suivis dans un **tableau de bord opérationnel** pour mesurer le ROI de la solution.
-
----
-
-## Cas d’usage industriels
-
-- **Maintenance prédictive sur équipements tournants**
-  - Pompes, moteurs, ventilateurs, compresseurs, convoyeurs…
-  - Utilisation des signaux de vibration, courant, température pour détecter :
-    - déséquilibres,
-    - défauts de roulements,
-    - surchauffes,
-    - dérives mécaniques.
-- **Surveillance de lignes de production**
-  - Lignes d’assemblage, conditionnement, embouteillage, impression, etc.
-  - Détection de dérives subtiles dans les cadences, forces, temps de cycle, qui annoncent une future panne ou une chute de qualité.
-- **Contrôle de procédés continus**
-  - Chimie, agroalimentaire, pharmaceutique, énergie.
-  - Surveillance de variables de process (pressions, débits, températures, concentrations) pour anticiper :
-    - dérives de consignes,
-    - instabilités,
-    - pertes de rendement.
-- **Qualité & métrologie**
-  - Analyse de mesures dimensionnelles, tests de fin de ligne, signaux de contrôle qualité.
-  - Identification de **profils de production anormaux** avant que la non‑qualité ne devienne massive.
+These KPIs can be tracked in an **operations dashboard** to quantify the ROI of the solution.
 
 ---
 
-## Pour qui dans l’usine ?
+## Industrial use cases
 
-- **Responsables maintenance & fiabilité**
-  - qui veulent réduire les pannes surprises et mieux planifier les interventions.
-- **Responsables de production & responsables d’atelier**
-  - qui visent une meilleure stabilité des lignes et un OEE plus élevé.
-- **Ingénieurs process & data engineers industriels**
-  - qui souhaitent exploiter pleinement la data existante pour créer des indicateurs avancés de santé machine / process.
-- **Direction industrielle**
-  - qui cherche des leviers concrets de **réduction des coûts** et d’**amélioration de la performance opérationnelle** via la data.
-
----
-
-## Comment GM‑VAE fonctionne (version simplifiée)
-
-Sans entrer dans les détails mathématiques :
-
-- Chaque fenêtre de données (par ex. quelques secondes ou minutes de capteurs) est encodée en un **vecteur latent** qui capture l’essentiel du comportement.
-- Un **mélange de gaussiennes** (clusters) représente les **régimes de fonctionnement normaux** appris : différents modes de marche, différentes configurations produit, etc.
-- Le **score d’anomalie** est calculé à partir de :
-  - la **probabilité** d’appartenance aux clusters,
-  - la **distance** à ces clusters,
-  - éventuellement l’**erreur de reconstruction**.
-- Les points très improbables ou mal reconstruits sont considérés comme **candidats anomalies**.
+- **Predictive maintenance on rotating equipment**
+  - Pumps, motors, fans, compressors, conveyors…
+  - Use of vibration, current, and temperature signals to detect:
+    - imbalance,
+    - bearing faults,
+    - overheating,
+    - mechanical drifts.
+- **Production line monitoring**
+  - Assembly, packaging, bottling, printing, etc.
+  - Detection of subtle drifts in cycle times, forces, or speeds that precede failures or quality issues.
+- **Continuous process control**
+  - Chemicals, food & beverage, pharma, energy.
+  - Monitoring process variables (pressure, flow, temperature, concentration) to anticipate:
+    - set‑point drifts,
+    - instabilities,
+    - yield or efficiency losses.
+- **Quality & metrology**
+  - Analysis of dimensional measurements, end‑of‑line tests, and quality control signals.
+  - Identification of **abnormal production profiles** before non‑quality becomes massive.
 
 ---
 
-## Intégration dans un workflow industriel
+## Who is it for in the plant?
 
-1. **Collecte & préparation des données**
-   - Agrégation des signaux capteurs, états machine, métriques de production.
-   - Construction de fenêtres temporelles (glissantes ou non) pour capturer le contexte.
-2. **Entraînement sur données historiques**
-   - Utilisation d’une période représentative (ex. plusieurs semaines/mois) où le système a principalement bien fonctionné.
-   - Entraînement de GM‑VAE pour apprendre les régimes normaux.
-3. **Scoring en temps réel ou quasi temps réel**
-   - Pour chaque nouvelle fenêtre de données :
-     - calcul du score d’anomalie,
-     - mise à jour d’indicateurs de santé.
-4. **Seuils & alerting**
-   - Définition de seuils par niveau de criticité (avertissement, alerte, arrêt).
-   - Intégration avec les outils existants : SCADA, MES, CMMS, e‑mail, SMS, Slack, etc.
-5. **Boucle d’amélioration continue**
-   - Retour des équipes terrain sur les alertes (vraie panne, fausse alerte, pré‑anomalie).
-   - Ajustement des seuils et, si besoin, ré‑entraînement périodique avec de nouvelles données.
+- **Maintenance & reliability managers**
+  - who want to reduce surprise breakdowns and better plan interventions.
+- **Production managers & line supervisors**
+  - who aim for more stable lines and higher OEE.
+- **Process engineers & industrial data engineers**
+  - who want to fully leverage existing data to create advanced health indicators for machines and processes.
+- **Industrial leadership**
+  - looking for concrete levers to **reduce costs** and **improve operational performance** through data.
 
 ---
 
-## Mise en route technique (haut niveau)
+## How GM‑VAE works (simplified view)
 
-Même si le focus est industriel, GM‑VAE reste un projet Python basé sur PyTorch :
+Without going deep into the math:
 
-- **Dépendances** : Python 3, PyTorch, torchvision, numpy, matplotlib, tensorboard.
-- **Entraînement de base** (exemple sur un jeu de données standard, à remplacer par vos données industrielles) :
+- Each time window of data (e.g., a few seconds or minutes of sensor readings) is encoded into a **latent vector** that captures the essential behavior.
+- A **Gaussian mixture** (clusters) represents the **normal operating regimes** learned from history: different modes, product variants, set‑ups, etc.
+- The **anomaly score** is computed from:
+  - the **probability** under the learned mixture,
+  - the **distance** to cluster centers,
+  - and optionally the **reconstruction error**.
+- Points that are very unlikely or poorly reconstructed are treated as **anomaly candidates**.
+
+---
+
+## Integration in an industrial workflow
+
+1. **Data collection & preparation**
+   - Aggregate sensor signals, machine states, and production metrics.
+   - Build time windows (sliding or fixed) to capture temporal context.
+2. **Training on historical data**
+   - Use a representative period (e.g., weeks or months) where the system mostly behaved correctly.
+   - Train GM‑VAE to learn normal regimes.
+3. **Real‑time or near real‑time scoring**
+   - For each new window of data:
+     - compute an anomaly score,
+     - update health indicators.
+4. **Thresholds & alerting**
+   - Define thresholds per criticality level (warning, alert, shut‑down).
+   - Integrate with existing tools: SCADA, MES, CMMS, email, SMS, Slack, etc.
+5. **Continuous improvement loop**
+   - Capture feedback from field teams on alerts (true fault, false alarm, early sign).
+   - Adjust thresholds and, if needed, periodically retrain with new data.
+
+---
+
+## Technical getting started (high level)
+
+Even with an industrial focus, GM‑VAE remains a Python project built on PyTorch:
+
+- **Dependencies**: Python 3, PyTorch, torchvision, numpy, matplotlib, tensorboard.
+- **Basic training** (example on a standard dataset, to be replaced by your industrial data):
 
 ```bash
 python train_gmvae.py --dataset cifar10 --K 10 --epochs 100
 ```
 
-Pour un cas industriel réel :
+For a real industrial setup:
 
-- remplacer le loader de données par vos propres signaux (ou embeddings déjà calculés),
-- ajuster le nombre de clusters `K` pour refléter vos différents régimes de fonctionnement,
-- connecter la sortie du modèle (score d’anomalie, appartenance aux clusters) à vos outils de monitoring.
+- replace the data loader with your own signals (or pre‑computed embeddings),
+- tune the number of clusters `K` to match your operating regimes,
+- connect the model outputs (anomaly score, cluster memberships) to your monitoring stack.
 
 ---
 
-## Vision produit pour l’industrie
+## Product vision for industry
 
-- **Aujourd’hui** : un moteur open‑source pour prototyper rapidement des cas de **maintenance prédictive** et de **détection de dérives de process**.
-- **Demain (exemples de roadmap orientée industrie)** :
-  - Packaging en **microservice d’“anomaly scoring” industriel**.
-  - Connecteurs standards (OPC‑UA, MQTT, Kafka, historiseurs, etc.).
-  - **Dashboard industriel** dédié à la santé des machines : carte des équipements, courbes de score d’anomalie, timelines d’incidents.
-  - Templates de déploiement par secteur (automobile, process, agro, énergie…) avec KPI préconfigurés (OEE, MTBF, scrap rate, etc.).
-
+- **Today**: an open‑source engine to rapidly prototype **predictive maintenance** and **process drift detection** use cases.
+- **Tomorrow (example industrial roadmap)**:
+  - Packaging as an industrial **“anomaly scoring” microservice**.
+  - Standard connectors (OPC‑UA, MQTT, Kafka, historians, etc.).
+  - An **industrial dashboard** dedicated to asset health: equipment map, anomaly score trends, incident timelines.
+  - Deployment templates by vertical (automotive, process industries, food & beverage, energy, etc.) with preconfigured KPIs (OEE, MTBF, scrap rate, etc.).
 

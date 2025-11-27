@@ -33,6 +33,16 @@ This GMM-VAE model is ideal for:
 - **Anomaly Detection**: Identify outliers in image collections
 - **Latent Space Exploration**: Visualize and manipulate images in latent space
 
+## Specialized READMEs & Business Use Cases
+
+For more **business‑oriented, storytelling and impact‑focused** descriptions, see:
+
+- **Industrial anomaly detection & predictive maintenance**  
+  See `README_industrie_anomalie.md` for a presentation focused on:
+  - monitoring industrial equipment,
+  - predictive maintenance,
+  - reducing unplanned downtime, scrap, and maintenance costs.
+
 ## Quick Start
 
 The project includes several convenient scripts for different training scenarios:
