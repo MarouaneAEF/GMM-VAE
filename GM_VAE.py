@@ -4,6 +4,28 @@ import torch.nn.functional as F
 import numpy as np
 import torchvision.models as tvm
 
+
+class ResBlock(nn.Module):
+    """
+    Residual block with GroupNorm + SiLU.
+    Used in both encoder and decoder for better gradient flow and detail recovery.
+    GroupNorm is preferred over BatchNorm: stable even with small batch sizes.
+    """
+    def __init__(self, channels):
+        super().__init__()
+        num_groups = min(32, channels)
+        self.block = nn.Sequential(
+            nn.GroupNorm(num_groups, channels),
+            nn.SiLU(),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
+            nn.GroupNorm(num_groups, channels),
+            nn.SiLU(),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
+        )
+
+    def forward(self, x):
+        return x + self.block(x)
+
 class Encoder(nn.Module):
     """
     Encoder network for GM-VAE that maps inputs to latent distribution parameters.
@@ -26,35 +48,35 @@ class Encoder(nn.Module):
         h = img_height if img_height is not None else img_size
 
         if h is not None and h <= 32:
-            # 3 stride-2 blocks: 32→16→8→4, then stride-1 to enrich at 4×4
+            # 3 stride-2 blocks: 32→16→8→4
             self.conv_features = nn.Sequential(
                 nn.Conv2d(input_channels, 64,  kernel_size=4, stride=2, padding=1, bias=False),
-                nn.BatchNorm2d(64),  nn.LeakyReLU(0.2, inplace=True),
+                nn.GroupNorm(min(32, 64), 64),   nn.SiLU(),
                 nn.Conv2d(64,  128, kernel_size=4, stride=2, padding=1, bias=False),
-                nn.BatchNorm2d(128), nn.LeakyReLU(0.2, inplace=True),
+                nn.GroupNorm(min(32, 128), 128), nn.SiLU(),
                 nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=1, bias=False),
-                nn.BatchNorm2d(256), nn.LeakyReLU(0.2, inplace=True),
+                nn.GroupNorm(min(32, 256), 256), nn.SiLU(),
                 nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1, bias=False),
-                nn.BatchNorm2d(512), nn.LeakyReLU(0.2, inplace=True),
+                nn.GroupNorm(32, 512),            nn.SiLU(),
+                ResBlock(512),   # enrich features at 4×4 before flattening
             )
-            self.global_pool = nn.Identity()   # stays at 4×4 — no extra pooling
+            self.global_pool = nn.Identity()
         else:
             # 5 stride-2 blocks for larger images (64px+)
             self.conv_features = nn.Sequential(
                 nn.Conv2d(input_channels, 32,  kernel_size=4, stride=2, padding=1, bias=False),
-                nn.BatchNorm2d(32),  nn.LeakyReLU(0.2, inplace=True),
+                nn.GroupNorm(min(32, 32), 32),   nn.SiLU(),
                 nn.Conv2d(32,  64,  kernel_size=4, stride=2, padding=1, bias=False),
-                nn.BatchNorm2d(64),  nn.LeakyReLU(0.2, inplace=True),
+                nn.GroupNorm(min(32, 64), 64),   nn.SiLU(),
                 nn.Conv2d(64,  128, kernel_size=4, stride=2, padding=1, bias=False),
-                nn.BatchNorm2d(128), nn.LeakyReLU(0.2, inplace=True),
+                nn.GroupNorm(min(32, 128), 128), nn.SiLU(),
                 nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=1, bias=False),
-                nn.BatchNorm2d(256), nn.LeakyReLU(0.2, inplace=True),
+                nn.GroupNorm(min(32, 256), 256), nn.SiLU(),
                 nn.Conv2d(256, 512, kernel_size=4, stride=2, padding=1, bias=False),
-                nn.BatchNorm2d(512), nn.LeakyReLU(0.2, inplace=True),
+                nn.GroupNorm(32, 512),            nn.SiLU(),
+                ResBlock(512),   # enrich before pooling
             )
             self.global_pool = nn.Sequential(
-                nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=False),
-                nn.BatchNorm2d(512), nn.LeakyReLU(0.2, inplace=True),
                 nn.AvgPool2d(kernel_size=3, stride=2, padding=1),
             )
 
@@ -111,10 +133,10 @@ class Encoder(nn.Module):
         
         # Distribution parameters
         mu_x = self.mu_x(x)
-        logvar_x = self.logvar_x(x)
-        
+        logvar_x = self.logvar_x(x).clamp(-10, 4)
+
         mu_w = self.mu_w(x)
-        logvar_w = self.logvar_w(x)
+        logvar_w = self.logvar_w(x).clamp(-10, 4)
         
         # Softmax for categorical distribution over clusters
         qz = F.softmax(self.qz(x), dim=1)
@@ -192,79 +214,73 @@ class PriorNetwork(nn.Module):
 
 class Decoder(nn.Module):
     """
-    Decoder network that maps x to reconstructed input.
+    Decoder: latent x → reconstructed image.
 
-    The number of upsampling stages is chosen based on the target resolution so
-    the network produces the target size *directly* — no bilinear interpolation
-    needed, which avoids quality loss from upscaling then downscaling.
+    Uses Upsample (nearest) + Conv2d + ResBlocks instead of ConvTranspose2d
+    to completely avoid checkerboard artifacts.
 
     Starting spatial size: 4×4
       target ≤  32 px → 3 stages  (4→8→16→32)
       target ≤  64 px → 4 stages  (4→8→16→32→64)
       target ≤ 128 px → 5 stages  (4→8→16→32→64→128)
-      larger targets   → 5 stages + bilinear upsampling (edge case)
+      larger targets   → 5 stages + bilinear final resize
     """
     def __init__(self, x_size=200, img_height=None, img_width=None, channels=3):
-        super(Decoder, self).__init__()
+        super().__init__()
         self.x_size = x_size
         self.img_height = img_height
         self.img_width = img_width
         self.channels = channels
         self.target_set = (img_height is not None and img_width is not None)
 
-        # Determine number of deconv stages from target size
         if img_height is not None:
             if img_height <= 32:
-                n_stages = 3   # 4 → 32
+                n_stages = 3
             elif img_height <= 64:
-                n_stages = 4   # 4 → 64
+                n_stages = 4
             else:
-                n_stages = 5   # 4 → 128
+                n_stages = 5
         else:
-            n_stages = 5       # unknown → default to 128, resize at forward time
+            n_stages = 5
 
         self._n_stages = n_stages
 
-        # Channel schedule per stage (from 512 down to channels)
+        # Project latent → 512 feature maps at 4×4
+        self.fc = nn.Sequential(
+            nn.Linear(x_size, 512 * 4 * 4, bias=False),
+            nn.BatchNorm1d(512 * 4 * 4),
+            nn.SiLU(),
+        )
+
+        # Channel schedule: 512 → 256 → 128 → 64 → 32 → channels
         ch = [512, 256, 128, 64, 32]
-        # Keep only as many intermediate stages as needed
         ch_in  = ch[:n_stages]
         ch_out = ch[1:n_stages] + [channels]
 
-        self.fc = nn.Sequential(
-            nn.Linear(x_size, 1024, bias=False),
-            nn.BatchNorm1d(1024),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(1024, 512 * 4 * 4, bias=False),
-            nn.BatchNorm1d(512 * 4 * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-        )
-
-        layers = []
+        stages = []
         for i, (ci, co) in enumerate(zip(ch_in, ch_out)):
-            layers.append(nn.ConvTranspose2d(ci, co, kernel_size=4, stride=2, padding=1, bias=False))
-            if i < n_stages - 1:          # no BN/ReLU after the last layer
-                layers.append(nn.BatchNorm2d(co))
-                layers.append(nn.LeakyReLU(0.2, inplace=True))
+            last = (i == n_stages - 1)
+            # ResBlock at current resolution (captures fine details before upsampling)
+            stages.append(ResBlock(ci))
+            # Upsample × 2 (nearest avoids checkerboard)
+            stages.append(nn.Upsample(scale_factor=2, mode='nearest'))
+            # Channel reduction conv
+            stages.append(nn.Conv2d(ci, co, kernel_size=3, padding=1, bias=False))
+            if not last:
+                stages.append(nn.GroupNorm(min(32, co), co))
+                stages.append(nn.SiLU())
 
-        self.deconv_stack = nn.Sequential(*layers)
+        self.up_stack = nn.Sequential(*stages)
 
     def forward(self, x_sample):
         batch_size = x_sample.size(0)
+        h = self.fc(x_sample).view(batch_size, 512, 4, 4)
+        output = self.up_stack(h)
 
-        h = self.fc(x_sample)
-        h = h.view(batch_size, 512, 4, 4)
-        output = self.deconv_stack(h)
-
-        # Only resize if the target is larger than what the stack produces
-        native = 4 * (2 ** self._n_stages)   # spatial size after deconvs
+        native = 4 * (2 ** self._n_stages)
         if self.target_set and (self.img_height != native or self.img_width != native):
-            output = F.interpolate(
-                output,
-                size=(self.img_height, self.img_width),
-                mode='bilinear',
-                align_corners=False,
-            )
+            output = F.interpolate(output, size=(self.img_height, self.img_width),
+                                   mode='bilinear', align_corners=False)
 
         return torch.sigmoid(output)
 
@@ -386,9 +402,37 @@ class GMVAELoss:
     """
     Loss function for the GM-VAE
     """
+
     @staticmethod
-    def compute_loss(recon_x, x, mu_w, logvar_w, qz, mu_x, logvar_x, mu_px, logvar_px, x_sample, x_size, K, 
-                    kl_weight=1.0, recon_weight=1.0):
+    def ssim_loss(recon_x: torch.Tensor, x: torch.Tensor, window_size: int = 11) -> torch.Tensor:
+        """
+        Structural Similarity loss: 1 - SSIM(recon_x, x).
+        Uses average pooling as a fast Gaussian approximation.
+        Returns a scalar in [0, 2] (typically near 0 for good reconstructions).
+        """
+        C1 = 0.01 ** 2
+        C2 = 0.03 ** 2
+        pad = window_size // 2
+
+        mu_r  = F.avg_pool2d(recon_x, window_size, stride=1, padding=pad)
+        mu_t  = F.avg_pool2d(x,       window_size, stride=1, padding=pad)
+
+        mu_r2 = mu_r ** 2
+        mu_t2 = mu_t ** 2
+        mu_rt = mu_r * mu_t
+
+        sigma_r2  = F.avg_pool2d(recon_x ** 2, window_size, stride=1, padding=pad) - mu_r2
+        sigma_t2  = F.avg_pool2d(x ** 2,       window_size, stride=1, padding=pad) - mu_t2
+        sigma_rt  = F.avg_pool2d(recon_x * x,  window_size, stride=1, padding=pad) - mu_rt
+
+        ssim_map = ((2 * mu_rt + C1) * (2 * sigma_rt + C2)) / \
+                   ((mu_r2 + mu_t2 + C1) * (sigma_r2 + sigma_t2 + C2))
+
+        return 1.0 - ssim_map.mean()
+
+    @staticmethod
+    def compute_loss(recon_x, x, mu_w, logvar_w, qz, mu_x, logvar_x, mu_px, logvar_px, x_sample, x_size, K,
+                    kl_weight=1.0, recon_weight=1.0, ssim_weight=0.0):
         """
         Compute the loss for the GM-VAE
         
@@ -411,10 +455,15 @@ class GMVAELoss:
         """
         batch_size = x.size(0)
         
-        # 1. Reconstruction loss — MSE is appropriate for continuous pixel values in [0,1]
-        # (BCE treats pixels as binary probabilities and gives poor reconstructions for
-        # natural images even when values are bounded to [0,1].)
-        recon_loss = F.mse_loss(recon_x, x, reduction='sum') * recon_weight
+        # 1. Reconstruction loss — MSE + optional SSIM on pixel values in [0,1].
+        # Normalise by number of pixels so the scale is invariant to image resolution.
+        n_pixels = x.size(1) * x.size(2) * x.size(3)
+        mse = F.mse_loss(recon_x, x, reduction='sum') / n_pixels
+        if ssim_weight > 0.0:
+            ssim = GMVAELoss.ssim_loss(recon_x, x)
+            recon_loss = ((1.0 - ssim_weight) * mse + ssim_weight * ssim) * recon_weight
+        else:
+            recon_loss = mse * recon_weight
         
         # 2. KL divergence between q(w) and p(w): KL(q(w) || p(w))
         kld_w = -0.5 * torch.sum(1 + logvar_w - mu_w.pow(2) - logvar_w.exp()) * kl_weight
@@ -427,10 +476,14 @@ class GMVAELoss:
         mu_x_expanded = mu_x.unsqueeze(-1).expand(-1, x_size, K)
         logvar_x_expanded = logvar_x.unsqueeze(-1).expand(-1, x_size, K)
         
+        # Clamp logvars to prevent numerical explosion (exp of very negative values → 0 → div by zero)
+        logvar_px_clamped = logvar_px.clamp(-10, 4)
+        logvar_x_clamped  = logvar_x_expanded.clamp(-10, 4)
+
         # Compute KL divergence between q(x) and p(x|z,w) for each cluster
         kld_qx_px = 0.5 * (
-            (logvar_px - logvar_x_expanded) + 
-            ((logvar_x_expanded.exp() + (mu_x_expanded - mu_px).pow(2)) / logvar_px.exp()) - 
+            (logvar_px_clamped - logvar_x_clamped) +
+            ((logvar_x_clamped.exp() + (mu_x_expanded - mu_px).pow(2)) / logvar_px_clamped.exp()) -
             1
         )
         
@@ -460,10 +513,10 @@ class GMVAELoss:
         total_loss = recon_loss + kld_w + kld_z + e_kld_qx_px
         
         # Store unweighted components for reporting
-        raw_recon_loss = F.mse_loss(recon_x, x, reduction='sum')
+        raw_recon_loss = mse
         raw_kld_w = -0.5 * torch.sum(1 + logvar_w - mu_w.pow(2) - logvar_w.exp())
         raw_kld_z = torch.sum(qz * torch.log(K * qz + 1e-10))
-        raw_e_kld_qx_px = torch.sum(torch.bmm(kld_qx_px, qz_expanded)) / kl_weight  # Remove weighting
+        raw_e_kld_qx_px = torch.sum(torch.bmm(kld_qx_px, qz_expanded)) / max(kl_weight, 1e-8)  # Avoid div by zero during annealing
         
         # Return total loss and individual components
         components = {

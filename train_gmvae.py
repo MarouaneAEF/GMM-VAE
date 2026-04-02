@@ -89,6 +89,16 @@ def parse_args():
                         help='Add VGG perceptual loss (sharper reconstructions)')
     parser.add_argument('--perceptual-weight', type=float, default=1.0,
                         help='Weight for perceptual loss (default: 1.0)')
+    parser.add_argument('--ssim-weight', type=float, default=0.0,
+                        help='Blend SSIM into reconstruction loss: 0=pure MSE, 1=pure SSIM (default: 0.0)')
+    parser.add_argument('--patience', type=int, default=0,
+                        help='Early stopping patience (epochs without improvement). 0 = disabled (default: 0)')
+    parser.add_argument('--test-interval', type=int, default=1,
+                        help='Run test/eval every N epochs (default: 1)')
+    parser.add_argument('--amp', action='store_true',
+                        help='Enable mixed precision (float16) via torch.autocast — ~1.5-2x speedup on MPS/CUDA')
+    parser.add_argument('--compile', action='store_true',
+                        help='Compile model with torch.compile() for extra speed (PyTorch 2.0+)')
 
     return parser.parse_args()
 
@@ -123,26 +133,29 @@ def train(model, train_loader, optimizer, epoch, device, args, writer, perceptua
         
         # Zero gradients
         optimizer.zero_grad()
-        
-        # Forward pass
-        mu_x, logvar_x, mu_px, logvar_px, qz, recon_x, mu_w, logvar_w, x_sample = model(data)
-        
-        # Compute loss with weighting
-        loss, components = GMVAELoss.compute_loss(
-            recon_x, data, mu_w, logvar_w, qz, mu_x, logvar_x, 
-            mu_px, logvar_px, x_sample, model.x_size, model.K,
-            kl_weight=kl_weight, recon_weight=recon_weight
-        )
-        
-        # Optional perceptual loss
-        if perceptual_loss is not None:
-            p_loss = perceptual_loss(recon_x, data) * args.perceptual_weight
-            loss = loss + p_loss
-            components['perceptual'] = p_loss.detach()
+
+        amp_ctx = torch.autocast(device_type=device, dtype=torch.float16) if args.amp else torch.autocast(device_type=device, enabled=False)
+        with amp_ctx:
+            # Forward pass
+            mu_x, logvar_x, mu_px, logvar_px, qz, recon_x, mu_w, logvar_w, x_sample = model(data)
+
+            # Compute loss with weighting
+            loss, components = GMVAELoss.compute_loss(
+                recon_x, data, mu_w, logvar_w, qz, mu_x, logvar_x,
+                mu_px, logvar_px, x_sample, model.x_size, model.K,
+                kl_weight=kl_weight, recon_weight=recon_weight,
+                ssim_weight=args.ssim_weight,
+            )
+
+            # Optional perceptual loss
+            if perceptual_loss is not None:
+                p_loss = perceptual_loss(recon_x, data) * args.perceptual_weight
+                loss = loss + p_loss
+                components['perceptual'] = p_loss.detach()
 
         # Backward pass and optimize
         loss.backward()
-        
+
         # Apply gradient clipping to prevent exploding gradients
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
         
@@ -278,11 +291,12 @@ def test(model, test_loader, epoch, device, args, writer, save_dir, perceptual_l
             
             # Compute loss with weighting
             loss, components = GMVAELoss.compute_loss(
-                recon_x, data, mu_w, logvar_w, qz, mu_x, logvar_x, 
+                recon_x, data, mu_w, logvar_w, qz, mu_x, logvar_x,
                 mu_px, logvar_px, x_sample, model.x_size, model.K,
-                kl_weight=kl_weight, recon_weight=recon_weight
+                kl_weight=kl_weight, recon_weight=recon_weight,
+                ssim_weight=args.ssim_weight,
             )
-            
+
             if perceptual_loss is not None:
                 p_loss = perceptual_loss(recon_x, data) * args.perceptual_weight
                 loss = loss + p_loss
@@ -454,6 +468,12 @@ def main():
             torch.backends.mps.set_benchmark_mode(True)
             print("MPS benchmark mode enabled")
     
+    # Optional torch.compile (PyTorch 2.0+)
+    if args.compile:
+        print("Compiling model with torch.compile()...")
+        model = torch.compile(model)
+        print("Model compiled.")
+
     # Optional perceptual loss
     perceptual_loss = None
     if args.perceptual:
@@ -489,12 +509,20 @@ def main():
     
     # Training loop
     best_loss = float('inf')
+    epochs_without_improvement = 0
     print(f"Starting training for {args.epochs} epochs...")
+    if args.patience > 0:
+        print(f"Early stopping enabled: patience={args.patience} epochs")
     progress_bar = tqdm(range(1, args.epochs + 1), desc="Training Progress")
-    
+
     for epoch in progress_bar:
         train_loss, train_components = train(model, train_loader, optimizer, epoch, device, args, writer, perceptual_loss)
-        test_loss, test_components = test(model, test_loader, epoch, device, args, writer, save_dir, perceptual_loss)
+
+        run_test = (epoch % args.test_interval == 0) or (epoch == args.epochs)
+        if run_test:
+            test_loss, test_components = test(model, test_loader, epoch, device, args, writer, save_dir, perceptual_loss)
+        else:
+            test_loss = best_loss  # keep previous best for scheduler/progress bar
         
         # Update progress bar with detailed loss information
         progress_bar.set_description(f"Epoch {epoch}/{args.epochs}")
@@ -523,14 +551,19 @@ def main():
         if epoch % args.save_interval == 0:
             torch.save(model.state_dict(), f'models/gmvae_{args.dataset}_K{args.K}_epoch_{epoch}.pt')
         
-        # Save best model
-        if test_loss < best_loss:
-            best_loss = test_loss
-            torch.save(model.state_dict(), f'models/gmvae_{args.dataset}_K{args.K}_best.pt')
-            
-            # Update progress bar with new best notification
-            progress_info["Best"] = f"{best_loss:.4f} (New Best!)" 
-            progress_bar.set_postfix(progress_info)
+        # Save best model (only when we actually evaluated)
+        if run_test:
+            if test_loss < best_loss:
+                best_loss = test_loss
+                epochs_without_improvement = 0
+                torch.save(model.state_dict(), f'models/gmvae_{args.dataset}_K{args.K}_best.pt')
+                progress_info["Best"] = f"{best_loss:.4f} (New Best!)"
+                progress_bar.set_postfix(progress_info)
+            else:
+                epochs_without_improvement += 1
+                if args.patience > 0 and epochs_without_improvement >= args.patience:
+                    print(f"\nEarly stopping triggered: no improvement for {args.patience} epochs.")
+                    break
     
     # Save final model
     torch.save(model.state_dict(), f'models/gmvae_{args.dataset}_K{args.K}_final.pt')

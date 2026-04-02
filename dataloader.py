@@ -169,21 +169,23 @@ def custom_dataloader(img_dir, batch_size, preserve_size=True, max_images=None, 
     if len(train_dataset) == 0:
         raise ValueError(f"No images found in the training set from {img_dir}")
     
-    # Create dataloaders with pin_memory for faster GPU transfer
+    # pin_memory only helps CUDA; on MPS it wastes RAM without benefit.
+    # num_workers=0 avoids spawning extra processes (each worker pre-fetches
+    # batches into RAM — on 8 GB machines this quickly saturates memory).
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        pin_memory=True,
-        num_workers=2
+        pin_memory=False,
+        num_workers=0,
     )
-    
+
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
-        pin_memory=True,
-        num_workers=2
+        pin_memory=False,
+        num_workers=0,
     )
     
     # Get image dimensions - use target_size if provided, otherwise from dataset
