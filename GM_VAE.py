@@ -191,7 +191,17 @@ class PriorNetwork(nn.Module):
 
 class Decoder(nn.Module):
     """
-    Decoder network that maps x to reconstructed input
+    Decoder network that maps x to reconstructed input.
+
+    The number of upsampling stages is chosen based on the target resolution so
+    the network produces the target size *directly* — no bilinear interpolation
+    needed, which avoids quality loss from upscaling then downscaling.
+
+    Starting spatial size: 4×4
+      target ≤  32 px → 3 stages  (4→8→16→32)
+      target ≤  64 px → 4 stages  (4→8→16→32→64)
+      target ≤ 128 px → 5 stages  (4→8→16→32→64→128)
+      larger targets   → 5 stages + bilinear upsampling (edge case)
     """
     def __init__(self, x_size=200, img_height=None, img_width=None, channels=3):
         super(Decoder, self).__init__()
@@ -199,82 +209,63 @@ class Decoder(nn.Module):
         self.img_height = img_height
         self.img_width = img_width
         self.channels = channels
-        
-        # Enhanced FC layers with progressive upsampling
+        self.target_set = (img_height is not None and img_width is not None)
+
+        # Determine number of deconv stages from target size
+        if img_height is not None:
+            if img_height <= 32:
+                n_stages = 3   # 4 → 32
+            elif img_height <= 64:
+                n_stages = 4   # 4 → 64
+            else:
+                n_stages = 5   # 4 → 128
+        else:
+            n_stages = 5       # unknown → default to 128, resize at forward time
+
+        self._n_stages = n_stages
+
+        # Channel schedule per stage (from 512 down to channels)
+        ch = [512, 256, 128, 64, 32]
+        # Keep only as many intermediate stages as needed
+        ch_in  = ch[:n_stages]
+        ch_out = ch[1:n_stages] + [channels]
+
         self.fc = nn.Sequential(
             nn.Linear(x_size, 1024, bias=False),
             nn.BatchNorm1d(1024),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(1024, 512 * 4 * 4, bias=False),
             nn.BatchNorm1d(512 * 4 * 4),
-            nn.LeakyReLU(0.2, inplace=True)
+            nn.LeakyReLU(0.2, inplace=True),
         )
-        
-        # Calculate output padding based on target size
-        self.target_set = (img_height is not None and img_width is not None)
-        
-        # Enhanced transpose convolution stack with residual connections
-        self.deconv_stack = nn.Sequential(
-            # First deconv block: 512 -> 256 channels (4x4 -> 8x8)
-            nn.ConvTranspose2d(512, 256, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(256),
-            nn.LeakyReLU(0.2, inplace=True),
-            
-            # Second deconv block: 256 -> 128 channels (8x8 -> 16x16)
-            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(128),
-            nn.LeakyReLU(0.2, inplace=True),
-            
-            # Third deconv block: 128 -> 64 channels (16x16 -> 32x32)
-            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.LeakyReLU(0.2, inplace=True),
-            
-            # Fourth deconv block: 64 -> 32 channels (32x32 -> 64x64)
-            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(32),
-            nn.LeakyReLU(0.2, inplace=True),
-            
-            # Fifth deconv block: 32 -> channels (64x64 -> 128x128)
-            nn.ConvTranspose2d(32, channels, kernel_size=4, stride=2, padding=1)
-        )
-        
-        # This will produce a 128x128 image. For other sizes, we'll use interpolation
-    
+
+        layers = []
+        for i, (ci, co) in enumerate(zip(ch_in, ch_out)):
+            layers.append(nn.ConvTranspose2d(ci, co, kernel_size=4, stride=2, padding=1, bias=False))
+            if i < n_stages - 1:          # no BN/ReLU after the last layer
+                layers.append(nn.BatchNorm2d(co))
+                layers.append(nn.LeakyReLU(0.2, inplace=True))
+
+        self.deconv_stack = nn.Sequential(*layers)
+
     def forward(self, x_sample):
-        """
-        Decode latent sample to reconstructed input
-        
-        Args:
-            x_sample: Sample from q(x|y) of shape [batch_size, x_size]
-            
-        Returns:
-            output: Reconstructed input
-        """
         batch_size = x_sample.size(0)
-        
-        # Fully connected processing
+
         h = self.fc(x_sample)
-        
-        # Reshape to match expected convolutional input
         h = h.view(batch_size, 512, 4, 4)
-        
-        # Apply deconvolution stack
-        output = self.deconv_stack(h)  # Results in [batch_size, channels, 128, 128]
-        
-        # If target size is specified and different from 128x128, resize
-        if self.target_set and (self.img_height != 128 or self.img_width != 128):
+        output = self.deconv_stack(h)
+
+        # Only resize if the target is larger than what the stack produces
+        native = 4 * (2 ** self._n_stages)   # spatial size after deconvs
+        if self.target_set and (self.img_height != native or self.img_width != native):
             output = F.interpolate(
-                output, 
-                size=(self.img_height, self.img_width), 
-                mode='bilinear', 
-                align_corners=False
+                output,
+                size=(self.img_height, self.img_width),
+                mode='bilinear',
+                align_corners=False,
             )
-        
-        # Apply sigmoid to get pixel values in [0, 1]
-        output = torch.sigmoid(output)
-        
-        return output
+
+        return torch.sigmoid(output)
 
 
 class GMVAE(nn.Module):
@@ -420,8 +411,10 @@ class GMVAELoss:
         """
         batch_size = x.size(0)
         
-        # 1. Reconstruction loss: -E[log P(y|x)]
-        recon_loss = F.binary_cross_entropy(recon_x, x, reduction='sum') * recon_weight
+        # 1. Reconstruction loss — MSE is appropriate for continuous pixel values in [0,1]
+        # (BCE treats pixels as binary probabilities and gives poor reconstructions for
+        # natural images even when values are bounded to [0,1].)
+        recon_loss = F.mse_loss(recon_x, x, reduction='sum') * recon_weight
         
         # 2. KL divergence between q(w) and p(w): KL(q(w) || p(w))
         kld_w = -0.5 * torch.sum(1 + logvar_w - mu_w.pow(2) - logvar_w.exp()) * kl_weight
@@ -467,7 +460,7 @@ class GMVAELoss:
         total_loss = recon_loss + kld_w + kld_z + e_kld_qx_px
         
         # Store unweighted components for reporting
-        raw_recon_loss = F.binary_cross_entropy(recon_x, x, reduction='sum')
+        raw_recon_loss = F.mse_loss(recon_x, x, reduction='sum')
         raw_kld_w = -0.5 * torch.sum(1 + logvar_w - mu_w.pow(2) - logvar_w.exp())
         raw_kld_z = torch.sum(qz * torch.log(K * qz + 1e-10))
         raw_e_kld_qx_px = torch.sum(torch.bmm(kld_qx_px, qz_expanded)) / kl_weight  # Remove weighting

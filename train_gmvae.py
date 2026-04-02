@@ -76,11 +76,15 @@ def parse_args():
     parser.add_argument('--kl-weight', type=float, default=1.0,
                         help='Weight for KL divergence term (default: 1.0)')
     parser.add_argument('--kl-anneal', action='store_true',
-                        help='Enable KL annealing for first 10 epochs')
+                        help='Enable KL annealing from 0 to kl-weight over kl-anneal-epochs')
+    parser.add_argument('--kl-anneal-epochs', type=int, default=30,
+                        help='Number of epochs to anneal KL weight (default: 30)')
     parser.add_argument('--recon-weight', type=float, default=1.0,
                         help='Weight for reconstruction loss (default: 1.0)')
     parser.add_argument('--clip-grad', type=float, default=1.0,
                         help='Gradient clipping value (default: 1.0)')
+    parser.add_argument('--lr-scheduler', action='store_true',
+                        help='Enable cosine LR scheduler')
     
     return parser.parse_args()
 
@@ -90,18 +94,20 @@ def train(model, train_loader, optimizer, epoch, device, args, writer):
     # Track separate loss components
     component_losses = {}
     
-    # Calculate KL weight for this epoch (for KL annealing)
+    # Calculate KL weight for this epoch (sigmoid-shaped annealing for smoother ramp-up)
     if args.kl_anneal:
-        # Anneal KL weight from 0 to args.kl_weight during first 10 epochs
-        kl_weight = min(args.kl_weight * epoch / 10, args.kl_weight) if epoch < 10 else args.kl_weight
+        t = epoch / args.kl_anneal_epochs
+        # Smoothstep: slow start, fast middle, plateaus at 1
+        t = min(t, 1.0)
+        t_smooth = t * t * (3 - 2 * t)
+        kl_weight = args.kl_weight * t_smooth
     else:
         kl_weight = args.kl_weight
-        
+
     # Reconstruction weight
     recon_weight = args.recon_weight
-    
-    # Log the current weights
-    print(f"Epoch {epoch}: KL weight = {kl_weight:.4f}, Reconstruction weight = {recon_weight:.4f}")
+
+    print(f"Epoch {epoch}: KL weight = {kl_weight:.4f}, Recon weight = {recon_weight:.4f}")
     
     # Wrap the data loader with tqdm for a progress bar
     pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{args.epochs}", leave=False)
@@ -221,16 +227,15 @@ def test(model, test_loader, epoch, device, args, writer, save_dir):
     # Track separate loss components
     component_losses = {}
     
-    # Calculate KL weight for this epoch (for KL annealing)
     if args.kl_anneal:
-        # Anneal KL weight from 0 to args.kl_weight during first 10 epochs
-        kl_weight = min(args.kl_weight * epoch / 10, args.kl_weight) if epoch < 10 else args.kl_weight
+        t = min(epoch / args.kl_anneal_epochs, 1.0)
+        t_smooth = t * t * (3 - 2 * t)
+        kl_weight = args.kl_weight * t_smooth
     else:
         kl_weight = args.kl_weight
-        
-    # Reconstruction weight
+
     recon_weight = args.recon_weight
-    
+
     # Create dedicated reconstructions directory
     reconstructions_dir = f'{save_dir}/reconstructions'
     os.makedirs(reconstructions_dir, exist_ok=True)
@@ -374,12 +379,15 @@ def main():
     writer = SummaryWriter(log_dir=f'runs/gmvae_{args.dataset}_K{args.K}')
     
     # Load dataset
+    img_height = img_width = None   # determined below for each dataset
     if args.dataset == 'mnist':
         train_loader, test_loader = dl.mnistloader(args.batch_size)
         input_channels = 1
+        img_height = img_width = 28   # MNIST is 28×28
     elif args.dataset == 'cifar10':
         train_loader, test_loader = dl.cifar10loader(args.batch_size)
         input_channels = 3
+        img_height = img_width = 32   # CIFAR-10 is 32×32
     elif args.dataset == 'custom':
         print(f"Loading custom dataset from {args.data_dir}")
         print(f"Maximum images to use: {args.max_images if args.max_images else 'All available'}")
@@ -404,18 +412,20 @@ def main():
     else:
         raise ValueError(f"Unknown dataset: {args.dataset}")
     
-    # Initialize model
+    # Initialize model — pass the known target size so the decoder builds the
+    # right number of deconv stages and avoids upscale→interpolate quality loss.
     model = GMVAE(
         input_channels=input_channels,
-        img_height=None,  # Always use dynamic sizing
-        img_width=None,   # Always use dynamic sizing
+        img_height=img_height,
+        img_width=img_width,
         hidden_size=args.hidden_size,
         x_size=args.x_size,
         w_size=args.w_size,
         K=args.K
     ).to(device)
-    
-    print(f"Model initialized with dynamic sizing for reconstruction")
+
+    print(f"Model initialized: target {img_height}×{img_width}, "
+          f"x_size={args.x_size}, w_size={args.w_size}, K={args.K}")
     
     # Apple Silicon MPS optimizations if requested
     if args.parallel_compute and device == 'mps':
@@ -430,8 +440,10 @@ def main():
             torch.backends.mps.set_benchmark_mode(True)
             print("MPS benchmark mode enabled")
     
-    # Initialize optimizer
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    # Initialize optimizer + optional cosine LR scheduler
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+    scheduler = (optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr * 0.05)
+                 if args.lr_scheduler else None)
     
     # Create save directory for this run
     dataset_name = args.dataset
@@ -481,7 +493,12 @@ def main():
             progress_info["Recon"] = f"{train_components['recon']:.4f}"
             
         progress_bar.set_postfix(progress_info)
-        
+
+        # Step LR scheduler
+        if scheduler is not None:
+            scheduler.step()
+            writer.add_scalar('train/lr', scheduler.get_last_lr()[0], epoch)
+
         # Save model periodically
         if epoch % args.save_interval == 0:
             torch.save(model.state_dict(), f'models/gmvae_{args.dataset}_K{args.K}_epoch_{epoch}.pt')
