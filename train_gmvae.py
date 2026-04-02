@@ -14,7 +14,7 @@ import torchvision.transforms as transforms
 from tqdm import tqdm
 
 # Import our model and data utilities
-from GM_VAE import GMVAE, GMVAELoss
+from GM_VAE import GMVAE, GMVAELoss, PerceptualLoss
 import dataloader as dl
 
 def set_device(args):
@@ -85,10 +85,14 @@ def parse_args():
                         help='Gradient clipping value (default: 1.0)')
     parser.add_argument('--lr-scheduler', action='store_true',
                         help='Enable cosine LR scheduler')
-    
+    parser.add_argument('--perceptual', action='store_true',
+                        help='Add VGG perceptual loss (sharper reconstructions)')
+    parser.add_argument('--perceptual-weight', type=float, default=1.0,
+                        help='Weight for perceptual loss (default: 1.0)')
+
     return parser.parse_args()
 
-def train(model, train_loader, optimizer, epoch, device, args, writer):
+def train(model, train_loader, optimizer, epoch, device, args, writer, perceptual_loss=None):
     model.train()
     train_loss = 0
     # Track separate loss components
@@ -130,6 +134,12 @@ def train(model, train_loader, optimizer, epoch, device, args, writer):
             kl_weight=kl_weight, recon_weight=recon_weight
         )
         
+        # Optional perceptual loss
+        if perceptual_loss is not None:
+            p_loss = perceptual_loss(recon_x, data) * args.perceptual_weight
+            loss = loss + p_loss
+            components['perceptual'] = p_loss.detach()
+
         # Backward pass and optimize
         loss.backward()
         
@@ -221,7 +231,7 @@ def save_comparison_grid(original_images, reconstructed_images, save_path, num_i
     
     print(f"Saved comparison grid to {save_path}")
 
-def test(model, test_loader, epoch, device, args, writer, save_dir):
+def test(model, test_loader, epoch, device, args, writer, save_dir, perceptual_loss=None):
     model.eval()
     test_loss = 0
     # Track separate loss components
@@ -273,19 +283,23 @@ def test(model, test_loader, epoch, device, args, writer, save_dir):
                 kl_weight=kl_weight, recon_weight=recon_weight
             )
             
+            if perceptual_loss is not None:
+                p_loss = perceptual_loss(recon_x, data) * args.perceptual_weight
+                loss = loss + p_loss
+                components['perceptual'] = p_loss.detach()
+
             # Accumulate loss
             test_loss += loss.item()
-            
+
             # Accumulate component losses
             for key, value in components.items():
                 if key not in component_losses:
                     component_losses[key] = 0.0
-                # Check if value is a tensor or already a float
                 if isinstance(value, torch.Tensor):
                     component_losses[key] += value.item()
                 else:
                     component_losses[key] += value
-            
+
             # Update progress bar
             postfix_dict = {"loss": f"{loss.item() / len(data):.4f}"}
             if "kl_w" in components:
@@ -440,6 +454,12 @@ def main():
             torch.backends.mps.set_benchmark_mode(True)
             print("MPS benchmark mode enabled")
     
+    # Optional perceptual loss
+    perceptual_loss = None
+    if args.perceptual:
+        perceptual_loss = PerceptualLoss().to(device)
+        print(f"Perceptual loss enabled (weight={args.perceptual_weight})")
+
     # Initialize optimizer + optional cosine LR scheduler
     optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
     scheduler = (optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr * 0.05)
@@ -473,8 +493,8 @@ def main():
     progress_bar = tqdm(range(1, args.epochs + 1), desc="Training Progress")
     
     for epoch in progress_bar:
-        train_loss, train_components = train(model, train_loader, optimizer, epoch, device, args, writer)
-        test_loss, test_components = test(model, test_loader, epoch, device, args, writer, save_dir)
+        train_loss, train_components = train(model, train_loader, optimizer, epoch, device, args, writer, perceptual_loss)
+        test_loss, test_components = test(model, test_loader, epoch, device, args, writer, save_dir, perceptual_loss)
         
         # Update progress bar with detailed loss information
         progress_bar.set_description(f"Epoch {epoch}/{args.epochs}")

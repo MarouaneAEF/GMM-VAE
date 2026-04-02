@@ -2,62 +2,63 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import torchvision.models as tvm
 
 class Encoder(nn.Module):
     """
-    Encoder network for GM-VAE that maps inputs to latent distribution parameters
+    Encoder network for GM-VAE that maps inputs to latent distribution parameters.
+
+    For small images (≤ 32 px) only 3 stride-2 blocks are used so the spatial
+    map stays at 4×4 instead of collapsing to 1×1, preserving much more
+    structural information for the decoder to work from.
     """
-    def __init__(self, input_channels=3, img_size=None, hidden_size=500, x_size=200, w_size=150, K=10):
+    def __init__(self, input_channels=3, img_size=None, img_height=None,
+                 hidden_size=500, x_size=200, w_size=150, K=10):
         super(Encoder, self).__init__()
         self.input_channels = input_channels
-        self.img_size = img_size  # Can be None for dynamic sizing
         self.hidden_size = hidden_size
         self.x_size = x_size
         self.w_size = w_size
         self.K = K
         self.flattened_size = None
-        
-        # Enhanced convolutional feature extraction - designed to work with variable sized inputs
-        # First part of the network with convolutional layers
-        self.conv_features = nn.Sequential(
-            # First block - 3 -> 32 channels
-            nn.Conv2d(input_channels, 32, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(32),
-            nn.LeakyReLU(0.2, inplace=True),
-            
-            # Second block - 32 -> 64 channels
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.LeakyReLU(0.2, inplace=True),
-            
-            # Third block - 64 -> 128 channels
-            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(128),
-            nn.LeakyReLU(0.2, inplace=True),
-            
-            # Fourth block - 128 -> 256 channels
-            nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(256),
-            nn.LeakyReLU(0.2, inplace=True),
-            
-            # Fifth block - 256 -> 512 channels
-            nn.Conv2d(256, 512, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(512),
-            nn.LeakyReLU(0.2, inplace=True),
-        )
-        
-        # MPS-compatible global pooling operation
-        self.global_pool = nn.Sequential(
-            # Instead of adaptive pooling, use fixed stride conv to reduce to exactly 4x4
-            # This avoids the MPS divisibility requirement 
-            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(512),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.AvgPool2d(kernel_size=3, stride=2, padding=1)  # Fixed pooling instead of adaptive
-        )
-        
-        # Calculate the flattened size after convolutions
-        self.adaptive_fc = None  # Will be created in the forward pass for the first time
+
+        # Resolve height from either parameter
+        h = img_height if img_height is not None else img_size
+
+        if h is not None and h <= 32:
+            # 3 stride-2 blocks: 32→16→8→4, then stride-1 to enrich at 4×4
+            self.conv_features = nn.Sequential(
+                nn.Conv2d(input_channels, 64,  kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(64),  nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(64,  128, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(128), nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(256), nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.BatchNorm2d(512), nn.LeakyReLU(0.2, inplace=True),
+            )
+            self.global_pool = nn.Identity()   # stays at 4×4 — no extra pooling
+        else:
+            # 5 stride-2 blocks for larger images (64px+)
+            self.conv_features = nn.Sequential(
+                nn.Conv2d(input_channels, 32,  kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(32),  nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(32,  64,  kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(64),  nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(64,  128, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(128), nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(256), nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(256, 512, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(512), nn.LeakyReLU(0.2, inplace=True),
+            )
+            self.global_pool = nn.Sequential(
+                nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.BatchNorm2d(512), nn.LeakyReLU(0.2, inplace=True),
+                nn.AvgPool2d(kernel_size=3, stride=2, padding=1),
+            )
+
+        self.adaptive_fc = None  # built lazily on first forward pass
     
     def forward(self, x):
         """
@@ -303,10 +304,9 @@ class GMVAE(nn.Module):
         self.w_size = w_size
         self.K = K
         
-        # Initialize encoder - will adapt to input size
         self.encoder = Encoder(
             input_channels=input_channels,
-            img_size=None,  # Let it adapt dynamically
+            img_height=img_height,
             hidden_size=hidden_size,
             x_size=x_size,
             w_size=w_size,
@@ -476,4 +476,50 @@ class GMVAELoss:
             'kl_weighted': kld_w + kld_z + e_kld_qx_px
         }
         
-        return total_loss, components 
+        return total_loss, components
+
+
+class PerceptualLoss(nn.Module):
+    """
+    VGG-based perceptual loss: MSE on intermediate feature maps instead of
+    raw pixels.  Works on any input size — images are upsampled to 64×64
+    before being fed to VGG so features are meaningful even for 32×32 inputs.
+
+    Usage:
+        ploss = PerceptualLoss().to(device)
+        loss  = ploss(recon_x, x)          # scalar, same scale as MSE loss
+    """
+    # VGG relu layers used for feature matching (relu1_2, relu2_2, relu3_3)
+    _LAYER_IDS = [4, 9, 16]
+
+    def __init__(self):
+        super().__init__()
+        vgg = tvm.vgg16(weights=tvm.VGG16_Weights.DEFAULT).features
+        # Keep only up to relu3_3 (index 16 inclusive)
+        self.slices = nn.ModuleList([
+            nn.Sequential(*list(vgg.children())[:idx])
+            for idx in self._LAYER_IDS
+        ])
+        for p in self.parameters():
+            p.requires_grad = False
+
+        # ImageNet normalisation (applied after clamping to [0,1])
+        self.register_buffer('mean', torch.tensor([0.485, 0.456, 0.406]).view(1,3,1,1))
+        self.register_buffer('std',  torch.tensor([0.229, 0.224, 0.225]).view(1,3,1,1))
+
+    def _norm(self, x):
+        return (x - self.mean) / self.std
+
+    def forward(self, recon, target):
+        # Upsample 32×32 → 64×64 so VGG features are meaningful
+        if recon.shape[-1] < 64:
+            recon  = F.interpolate(recon,  size=64, mode='bilinear', align_corners=False)
+            target = F.interpolate(target, size=64, mode='bilinear', align_corners=False)
+
+        recon  = self._norm(recon.clamp(0, 1))
+        target = self._norm(target.clamp(0, 1))
+
+        loss = 0.0
+        for sl in self.slices:
+            loss = loss + F.mse_loss(sl(recon), sl(target))
+        return loss
